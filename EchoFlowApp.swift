@@ -20,12 +20,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var statusItem: NSStatusItem?
     var hud: GlassPillHUD?
     let engine = AudioEngine()
+    var hotkeyManager: HotkeyManager?
     
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Ensure LSUIElement behavior (No dock icon)
         NSApp.setActivationPolicy(.accessory)
         
+        AppLog.info("EchoFlow App Launched. Setup initiating...", category: .general)
+        
         hud = GlassPillHUD()
+        hotkeyManager = HotkeyManager()
+        
+        // Link Hotkey to Audio Toggle
+        hotkeyManager?.onHotkeyPressed = { [weak self] in
+            self?.toggleHUD()
+        }
         
         // Setup MenuBar icon
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -55,14 +64,27 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     @objc private func toggleHUD() {
         if engine.isRecording {
+            AppLog.debug("User requested stop recording.", category: .audio)
             engine.stopRecording()
             hud?.hide()
         } else {
             do {
+                AppLog.debug("User requested start recording via Hotkey/Menu.", category: .audio)
                 try engine.startRecording()
-                hud?.show(transcription: "Listening...", audioLevel: 0.1)
+                hud?.show(transcription: "Listening securely...", audioLevel: 0.1)
+                
+            } catch PrivacyShield.PrivacyError.secureInputActive {
+                AppLog.warning("Recording blocked by Secure Input Shield.", category: .privacy)
+                hud?.show(transcription: "🔒 Blocked by Privacy Shield", audioLevel: 0.0)
+                
+                // Hide after 3 seconds
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
+                    if self?.engine.isRecording == false {
+                        self?.hud?.hide()
+                    }
+                }
             } catch {
-                print("Failed to start audio engine: \\(error)")
+                AppLog.error("Failed to start audio engine: \(error)", category: .audio)
             }
         }
     }

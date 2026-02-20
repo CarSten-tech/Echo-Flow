@@ -9,7 +9,7 @@ public final class AudioEngine: ObservableObject {
     @Published public private(set) var isRecording: Bool = false
     @Published public private(set) var audioLevel: Float = 0.0
     
-    // Callback to pass captured PCM buffers to STT processor
+    // Callback to pass captured PCM buffers to STT processor (or XPC service)
     public var onBufferReceived: ((AVAudioPCMBuffer) -> Void)?
     
     public init() {}
@@ -18,7 +18,11 @@ public final class AudioEngine: ObservableObject {
     public func startRecording() throws {
         guard !isRecording else { return }
         
+        // ENTERPRISE SECURITY: Block audio recording if password field is focused
+        try PrivacyShield.assertSafeInputEnvironment()
+        
         let format = inputNode.outputFormat(forBus: 0)
+        AppLog.info("Starting AudioEngine recording. Format: \(format)", category: .audio)
         
         inputNode.installTap(onBus: 0, bufferSize: 4096, format: format) { [weak self] buffer, time in
             guard let self = self else { return }
@@ -41,6 +45,7 @@ public final class AudioEngine: ObservableObject {
     /// Stops audio capture.
     public func stopRecording() {
         guard isRecording else { return }
+        AppLog.info("Stopping AudioEngine recording.", category: .audio)
         
         inputNode.removeTap(onBus: 0)
         engine.stop()
@@ -71,3 +76,4 @@ public final class AudioEngine: ObservableObject {
         }
     }
 }
+

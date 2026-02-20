@@ -1,41 +1,47 @@
 import Foundation
+import AppKit
 
-/// Executes automated tasks on macOS using osascript (AppleScript/JXA).
+/// Executes automated tasks on macOS using native `NSAppleScript`.
+/// This avoids the overhead of spawning shell processes via `/usr/bin/osascript`.
 public final class WorkflowHandler {
     
     public init() {}
     
     /// Executes a system command based on the route parameters.
-    public func executeCommand(action: String, parameters: [String: String]) async throws {
+    public func executeCommand(action: String, parameters: [String: String]) {
+        AppLog.info("Preparing to execute workflow for action: \(action)", category: .routing)
+        
         switch action {
+        case "open_app":
+            if let appName = parameters["app_name"] {
+                openApp(name: appName)
+            } else {
+                AppLog.error("Missing 'app_name' parameter for open_app action", category: .routing)
+            }
+            
         case "send_email":
             let recipient = parameters["recipient"] ?? ""
             let body = parameters["body"] ?? ""
-            try await invokeAppleScript(template: emailScript(to: recipient, body: body))
+            AppLog.info("Would draft email to: \(recipient)", category: .routing)
+            executeAppleScript(source: emailScript(to: recipient, body: body))
             
         case "paste_text":
+            // This would normally be handled by TextInjector, but keeping as fallback
             let text = parameters["text"] ?? ""
-            try await invokeAppleScript(template: pasteScript(text: text))
+            executeAppleScript(source: pasteScript(text: text))
             
         default:
-            print("Unknown action: \(action)")
+            AppLog.warning("Unknown command action: \(action)", category: .routing)
         }
     }
     
-    /// Runs AppleScript via the /usr/bin/osascript command line wrapper.
-    private func invokeAppleScript(template: String) async throws {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-        
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = pipe
-        
-        // Feed the script to standard input
-        process.arguments = ["-e", template]
-        
-        try process.run()
-        process.waitUntilExit()
+    // MARK: - Dedicated Workflows
+    
+    private func openApp(name: String) {
+        let safeName = name.replacingOccurrences(of: "\"", with: "")
+                           .replacingOccurrences(of: "\\", with: "")
+        let source = "tell application \"\(safeName)\"\nactivate\nend tell"
+        executeAppleScript(source: source)
     }
     
     private func emailScript(to recipient: String, body: String) -> String {
@@ -58,4 +64,29 @@ public final class WorkflowHandler {
         end tell
         """
     }
+    
+    // MARK: - Native Execution Engine
+    
+    /// Compiles and executes the provided AppleScript string natively on the main thread.
+    private func executeAppleScript(source: String) {
+        // Since NSAppleScript often interacts with System Events or app UIs
+        guard AXIsProcessTrusted() else {
+            AppLog.error("Missing Accessibility Privileges. Cannot execute AppleScript.", category: .routing)
+            return
+        }
+        
+        var errorInfo: NSDictionary?
+        if let scriptObject = NSAppleScript(source: source) {
+            scriptObject.executeAndReturnError(&errorInfo)
+            
+            if let error = errorInfo {
+                AppLog.error("NSAppleScript execution failed: \(error)", category: .routing)
+            } else {
+                AppLog.info("Successfully executed AppleScript.", category: .routing)
+            }
+        } else {
+            AppLog.error("Failed to compile AppleScript source.", category: .routing)
+        }
+    }
 }
+
