@@ -82,6 +82,11 @@ public class GlassPillHUD {
                 .padding(.horizontal, 16)
             }
             .frame(height: 50)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Echo Flow Dictation HUD")
+            .accessibilityValue(transcription.isEmpty ? "Listening" : transcription)
+            .accessibilityHint("Displays real-time dictation text and microphone levels.")
+            .accessibilityAddTraits(.updatesFrequently)
         )
     }
 }

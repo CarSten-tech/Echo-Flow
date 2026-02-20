@@ -4,6 +4,10 @@ import GoogleGenerativeAI
 
 /// Automates the decision process to determine if speech is dictation or a command
 /// using Gemini Function Calling.
+///
+/// `IntentRouter` processes raw transcribed text and evaluates it contextually.
+/// It decides between injecting text directly (`.dictation`) or generating an
+/// actionable payload (`.command`) via the `WorkflowHandler`.
 public final class IntentRouter: ObservableObject {
     
     // We would inject GeminiProvider via DI in a real app
@@ -22,7 +26,12 @@ public final class IntentRouter: ObservableObject {
         }
     }
     
-    /// Routes the incoming transcription string to the proper output lane using Function Calls.
+    /// Evaluates the user's spoken transcription against the active system context.
+    ///
+    /// - Parameters:
+    ///   - transcription: The raw spoken text transcribed by WhisperKit.
+    ///   - context: The current active `AppContext` (e.g., active application name) used to tailor the LLM prompt. Defaults to `nil`.
+    /// - Returns: A `RouteResult` indicating whether the text should be typed or executed as an AppleScript command.
     public func route(transcription: String, context: AppContext? = nil) async -> RouteResult {
         guard isSetup else {
             AppLog.warning("GeminiProvider unavailable. Falling back to Local Inference.", category: .routing)

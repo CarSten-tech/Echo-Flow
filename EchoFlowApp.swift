@@ -93,4 +93,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
         NSApp.activate(ignoringOtherApps: true)
     }
+    
+    func applicationWillTerminate(_ aNotification: Notification) {
+        AppLog.info("EchoFlow is shutting down. Invalidating XPC Engine connections.", category: .xpc)
+        // In a full implementation, you'd retain a reference to the NSXPCConnection here:
+        // xpcConnection?.invalidate()
+    }
 }

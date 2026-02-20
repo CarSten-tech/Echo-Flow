@@ -8,6 +8,10 @@ public final class WorkflowHandler {
     public init() {}
     
     /// Executes a system command based on the route parameters.
+    ///
+    /// - Parameters:
+    ///   - action: The string identifier of the action to execute (e.g., "open_app", "send_email").
+    ///   - parameters: A dictionary containing the required arguments for the specific action payload.
     public func executeCommand(action: String, parameters: [String: String]) {
         AppLog.info("Preparing to execute workflow for action: \(action)", category: .routing)
         
