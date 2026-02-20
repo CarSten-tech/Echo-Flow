@@ -67,11 +67,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             AppLog.debug("User requested stop recording.", category: .audio)
             engine.stopRecording()
             hud?.hide()
+            statusItem?.button?.image = NSImage(systemSymbolName: "waveform.circle", accessibilityDescription: "EchoFlow: Idle")
+            statusItem?.button?.contentTintColor = nil
         } else {
             do {
                 AppLog.debug("User requested start recording via Hotkey/Menu.", category: .audio)
                 try engine.startRecording()
                 hud?.show(transcription: "Listening securely...", audioLevel: 0.1)
+                
+                statusItem?.button?.image = NSImage(systemSymbolName: "waveform.circle.fill", accessibilityDescription: "EchoFlow: Recording")
+                statusItem?.button?.contentTintColor = .systemRed
                 
             } catch PrivacyShield.PrivacyError.secureInputActive {
                 AppLog.warning("Recording blocked by Secure Input Shield.", category: .privacy)

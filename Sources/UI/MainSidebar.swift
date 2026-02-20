@@ -42,12 +42,43 @@ public struct MainSidebar: View {
         } detail: {
             // Main content area based on selection
             if let selection = selection {
-                Text("\(selection.rawValue) View")
-                    .font(.largeTitle)
-                    .foregroundColor(.secondary)
+                if selection == .styles {
+                    StylesSettingsView()
+                } else {
+                    Text("\(selection.rawValue) View")
+                        .font(.largeTitle)
+                        .foregroundColor(.secondary)
+                }
             } else {
                 Text("Select an item")
             }
         }
+    }
+}
+
+/// A dedicated settings panel to modify the appearance of EchoFlow.
+struct StylesSettingsView: View {
+    @AppStorage("hudSize") private var hudSize: String = "Medium"
+    let sizes = ["Small", "Medium", "Large"]
+    
+    var body: some View {
+        Form {
+            Section(header: Text("HUD Appearance").font(.headline)) {
+                Picker("Pill Size", selection: $hudSize) {
+                    ForEach(sizes, id: \.self) { size in
+                        Text(size).tag(size)
+                    }
+                }
+                .pickerStyle(SegmentedPickerStyle())
+                .padding(.bottom, 8)
+                
+                Text("Changes to the HUD size reflect immediately on the next dictation session.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+        }
+        .padding()
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .navigationTitle("Styles & Appearance")
     }
 }

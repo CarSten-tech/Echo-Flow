@@ -58,35 +58,51 @@ public class GlassPillHUD {
         window?.orderOut(nil)
     }
     
+    private func getHUDHeight() -> CGFloat {
+        let sizePref = UserDefaults.standard.string(forKey: "hudSize") ?? "Medium"
+        switch sizePref {
+        case "Small": return 40
+        case "Large": return 70
+        default: return 50
+        }
+    }
+    
     private func pillContentView(transcription: String, level: Float) -> AnyView {
-        AnyView(
-            ZStack {
-                VisualEffectView()
-                    .clipShape(Capsule())
-                    
-                HStack(spacing: 12) {
-                    // Simple simulated waveform circle based on audio level
-                    Circle()
-                        .fill(Color.accentColor)
-                        .frame(width: CGFloat(10 + (level * 20)), height: CGFloat(10 + (level * 20)))
-                        .animation(.linear(duration: 0.1), value: level)
-                    
-                    Text(transcription.isEmpty ? "Listening..." : transcription)
-                        .font(.system(.body, design: .rounded))
-                        .foregroundColor(.primary)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                    
-                    Spacer(minLength: 0)
-                }
-                .padding(.horizontal, 16)
+        let sizePref = UserDefaults.standard.string(forKey: "hudSize") ?? "Medium"
+        let fontStyle: Font.TextStyle = sizePref == "Small" ? .caption : (sizePref == "Large" ? .title3 : .body)
+        let height = getHUDHeight()
+        
+        let circleSize: CGFloat = CGFloat(10 + (level * 20))
+        let textToShow = transcription.isEmpty ? "Listening..." : transcription
+        
+        // Break up expression to help the Swift 5.9 type checker
+        let content = ZStack {
+            VisualEffectView()
+                .clipShape(Capsule())
+                
+            HStack(spacing: 12) {
+                Circle()
+                    .fill(Color.accentColor)
+                    .frame(width: circleSize, height: circleSize)
+                    .animation(.linear(duration: 0.1), value: level)
+                
+                Text(textToShow)
+                    .font(.system(fontStyle, design: .rounded))
+                    .foregroundColor(.primary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                
+                Spacer(minLength: 0)
             }
-            .frame(height: 50)
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel("Echo Flow Dictation HUD")
-            .accessibilityValue(transcription.isEmpty ? "Listening" : transcription)
-            .accessibilityHint("Displays real-time dictation text and microphone levels.")
-            .accessibilityAddTraits(.updatesFrequently)
-        )
+            .padding(.horizontal, 16)
+        }
+        .frame(height: height)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Echo Flow Dictation HUD")
+        .accessibilityValue(textToShow)
+        .accessibilityHint("Displays real-time dictation text and microphone levels.")
+        .accessibilityAddTraits(.updatesFrequently)
+        
+        return AnyView(content)
     }
 }
