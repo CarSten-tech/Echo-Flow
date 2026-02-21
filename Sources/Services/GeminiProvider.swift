@@ -1,23 +1,27 @@
 import Foundation
+import Shared
 import GoogleGenerativeAI
 
 /// Enterprise-grade provider for the Google Gemini API.
 /// Utilizes the official SDK for streaming and function calling support.
-public final class GeminiProvider {
+public final class GeminiProvider: LLMProviderProtocol {
     
     /// The initialized model ready for generation.
     public private(set) var model: GenerativeModel?
-    private let modelName = "gemini-1.5-pro-latest"
+    private let modelName: String
+    private var apiKey: String
     
-    public init() {}
+    public init(apiKey: String, modelName: String = "gemini-2.0-flash") {
+        self.apiKey = apiKey
+        self.modelName = modelName
+    }
     
     /// Initializes the GenerativeModel instance securely.
-    /// This should be called before any generation attempts.
     public func setup() throws {
-        // In a real app, this key should never be hardcoded or logged.
-        let apiKey = try KeychainService.load(key: "GeminiAPIKey")
+        guard !apiKey.isEmpty else {
+            throw NSError(domain: "GeminiProvider", code: 1, userInfo: [NSLocalizedDescriptionKey: "Gemini API Key is missing."])
+        }
         
-        // Define Model Configuration
         let config = GenerationConfig(
             temperature: 0.1, // Low temperature for deterministic routing
             topP: 0.8,
@@ -32,34 +36,58 @@ public final class GeminiProvider {
             tools: [EchoFlowTools.routingTools]
         )
         
-        AppLog.info("GeminiProvider successfully initialized with SDK.", category: .inference)
+        AppLog.info("GeminiProvider successfully initialized.", category: .inference)
     }
     
-    /// Generates a streaming response from the Gemini API.
-    /// - Parameter prompt: The consolidated system instructions + user audio text.
-    /// - Returns: An AsyncThrowingStream of generated text chunks.
-    public func generateStream(from prompt: String) -> AsyncThrowingStream<String, Error>? {
+    public func routeIntent(transcription: String, context: AppContext?) async throws -> RouteResult {
         guard let model = model else {
-            AppLog.error("GeminiProvider: Model not initialized. Did you call setup()?", category: .inference)
-            return nil
+            throw NSError(domain: "GeminiProvider", code: 2, userInfo: [NSLocalizedDescriptionKey: "Model not initialized."])
         }
         
-        let responseStream = model.generateContentStream(prompt)
+        var prompt = """
+        You are EchoFlow, a high-performance audio router for macOS.
+        Analyze the following transcribed text from the user. 
+        Your ONLY job is to call either the `process_dictation` tool OR the `run_system_command` tool.
+        DO NOT respond with conversational text.
+        """
         
-        return AsyncThrowingStream { continuation in
-            Task {
-                do {
-                    for try await chunk in responseStream {
-                        if let text = chunk.text {
-                            continuation.yield(text)
-                        }
-                    }
-                    continuation.finish()
-                } catch {
-                    AppLog.error("GeminiProvider Stream Error: \(error.localizedDescription)", category: .inference)
-                    continuation.finish(throwing: error)
+        if let ctx = context {
+            prompt += "\n\nCONTEXT:\n\(ctx.contextualPromptModifier)"
+        }
+        
+        prompt += "\n\nUser Text: \"\(transcription)\""
+        
+        AppLog.debug("Requesting generative route from Gemini...", category: .inference)
+        let response = try await model.generateContent(prompt)
+        
+        // Parse Function Calling Array
+        if let functionCall = response.functionCalls.first {
+            AppLog.debug("Gemini selected Function: \(functionCall.name)", category: .routing)
+            
+            if functionCall.name == "process_dictation",
+               let formattedText = functionCall.args["formatted_text"] as? String {
+                
+                return .dictation(formattedText)
+                
+            } else if functionCall.name == "run_system_command",
+                      let action = functionCall.args["action"] as? String {
+                
+                var paramsDict: [String: String] = [:]
+                if let paramsStr = functionCall.args["parameters"] as? String,
+                   let data = paramsStr.data(using: .utf8),
+                   let dict = try? JSONSerialization.jsonObject(with: data) as? [String: String] {
+                    paramsDict = dict
                 }
+                
+                return .command(action: action, parameters: paramsDict)
             }
         }
+        
+        if let text = response.text {
+            AppLog.warning("Gemini hallucinated a non-tool response. Falling back.", category: .routing)
+            return .dictation(text)
+        }
+        
+        throw NSError(domain: "GeminiProvider", code: 3, userInfo: [NSLocalizedDescriptionKey: "Invalid Gemini Response"])
     }
 }

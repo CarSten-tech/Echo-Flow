@@ -8,16 +8,19 @@ import Shared
     
     private var whisperKit: WhisperKit?
     private var isInitialized = false
+    private var initialPrompt: String?
     
     public override init() {
         super.init()
     }
     
-    public func initializeEngine(modelName: String, reply: @escaping (Bool, String?) -> Void) {
+    public func initializeEngine(modelName: String, initialPrompt: String?, reply: @escaping (Bool, String?) -> Void) {
         guard !isInitialized else {
             reply(true, "Already initialized")
             return
         }
+        
+        self.initialPrompt = initialPrompt
         
         Task {
             do {

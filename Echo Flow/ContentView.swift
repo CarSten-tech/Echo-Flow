@@ -6,16 +6,36 @@
 //
 
 import SwiftUI
+import KeyboardShortcuts
 
 struct ContentView: View {
     var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hell, world!")
+        TabView {
+            ProviderSettingsView()
+                .tabItem {
+                    Label("AI Provider", systemImage: "network")
+                }
+            
+            Form {
+                Section(header: Text("Global Shortcut")) {
+                    KeyboardShortcuts.Recorder("Dictation Shortcut:", name: .toggleDictation)
+                    Text("Press and hold this shortcut to record. Release to process.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            .padding(20)
+            .tabItem {
+                Label("General", systemImage: "gear")
+            }
+            
+            LicenseSettingsView()
+                .tabItem {
+                    Label("License", systemImage: "key.fill")
+                }
         }
         .padding()
+        .frame(minWidth: 500, minHeight: 400)
     }
 }
 

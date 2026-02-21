@@ -6,10 +6,12 @@ import CoreGraphics
 /// using a high-performance clipboard swap technique.
 public struct TextInjector {
     
-    /// Injects text into the active text field.
+    /// Injects text into the active text field by bypassing the native copy-paste buffer.
+    /// It temporarily stores the user's clipboard, inserts the dictated text, synthesizes a Cmd+V keystroke,
+    /// and then asynchronously restores the original clipboard to avoid destroying user data.
     ///
     /// - Parameter text: The cleaned and formatted text ready for injection.
-    public static func inject(text: String) {
+    @MainActor public static func inject(text: String) {
         // 1. Ensure we have Accessibility rights to send synthetic key events
         guard AXIsProcessTrusted() else {
             AppLog.error("Missing Accessibility Privileges. Cannot inject text.", category: .routing)
@@ -40,10 +42,17 @@ public struct TextInjector {
         emitPasteCommand()
         
         // 5. Restore clipboard backup asynchronously to ensure the App had time to consume the paste
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            pasteboard.clearContents()
-            pasteboard.writeObjects(backupItems)
-            AppLog.debug("Clipboard restored.", category: .routing)
+        Task { [backupItems] in
+            do {
+                // Wait 0.3 seconds to allow slower apps to process the Cmd+V
+                try await Task.sleep(nanoseconds: 300_000_000)
+                
+                pasteboard.clearContents()
+                pasteboard.writeObjects(backupItems)
+                AppLog.debug("Clipboard restored.", category: .routing)
+            } catch {
+                AppLog.error("Clipboard restoration task was cancelled or failed: \(error)", category: .routing)
+            }
         }
     }
     

@@ -40,11 +40,15 @@ public struct MainSidebar: View {
             .navigationSplitViewColumnWidth(min: 200, ideal: 250, max: 300)
             #endif
         } detail: {
-            // Main content area based on selection
             if let selection = selection {
-                if selection == .styles {
+                switch selection {
+                case .hotkeys:
+                    HotkeySettingsView()
+                case .models:
+                    ProviderSettingsView()
+                case .styles:
                     StylesSettingsView()
-                } else {
+                default:
                     Text("\(selection.rawValue) View")
                         .font(.largeTitle)
                         .foregroundColor(.secondary)

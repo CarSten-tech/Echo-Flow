@@ -41,6 +41,8 @@ public final class WorkflowHandler {
     
     // MARK: - Dedicated Workflows
     
+    /// Generates and executes an AppleScript to bring a specific application to the foreground.
+    /// - Parameter name: The name of the macOS application.
     private func openApp(name: String) {
         let safeName = name.replacingOccurrences(of: "\"", with: "")
                            .replacingOccurrences(of: "\\", with: "")
@@ -48,6 +50,11 @@ public final class WorkflowHandler {
         executeAppleScript(source: source)
     }
     
+    /// Constructs an AppleScript payload to draft a new email in the Mail app.
+    /// - Parameters:
+    ///   - recipient: The destination email address.
+    ///   - body: The generated text body for the email.
+    /// - Returns: A raw AppleScript string.
     private func emailScript(to recipient: String, body: String) -> String {
         return """
         tell application "Mail"
@@ -60,6 +67,9 @@ public final class WorkflowHandler {
         """
     }
     
+    /// Constructs an AppleScript payload to set the clipboard and simulate Cmd+V using System Events.
+    /// - Parameter text: The text to paste.
+    /// - Returns: A raw AppleScript string.
     private func pasteScript(text: String) -> String {
         return """
         set the clipboard to "\(text)"
@@ -71,7 +81,7 @@ public final class WorkflowHandler {
     
     // MARK: - Native Execution Engine
     
-    /// Compiles and executes the provided AppleScript string natively on the main thread.
+    /// Compiles and executes the provided AppleScript string natively on a background thread.
     private func executeAppleScript(source: String) {
         // Since NSAppleScript often interacts with System Events or app UIs
         guard AXIsProcessTrusted() else {
@@ -79,17 +89,19 @@ public final class WorkflowHandler {
             return
         }
         
-        var errorInfo: NSDictionary?
-        if let scriptObject = NSAppleScript(source: source) {
-            scriptObject.executeAndReturnError(&errorInfo)
-            
-            if let error = errorInfo {
-                AppLog.error("NSAppleScript execution failed: \(error)", category: .routing)
+        Task.detached {
+            var errorInfo: NSDictionary?
+            if let scriptObject = NSAppleScript(source: source) {
+                scriptObject.executeAndReturnError(&errorInfo)
+                
+                if let error = errorInfo {
+                    AppLog.error("NSAppleScript execution failed: \(error)", category: .routing)
+                } else {
+                    AppLog.info("Successfully executed AppleScript.", category: .routing)
+                }
             } else {
-                AppLog.info("Successfully executed AppleScript.", category: .routing)
+                AppLog.error("Failed to compile AppleScript source.", category: .routing)
             }
-        } else {
-            AppLog.error("Failed to compile AppleScript source.", category: .routing)
         }
     }
 }

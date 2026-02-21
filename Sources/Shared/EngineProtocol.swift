@@ -4,11 +4,12 @@ import IOSurface
 /// Defines the communication protocol between the Main App and the XPC Engine.
 @objc public protocol EngineProtocol {
     
-    /// Initializes the engine, specifically loading the Whisper ML Model.
+    /// Initializes the engine, specifically loading the Whisper ML Model and passing any custom vocabulary.
     /// - Parameters:
     ///   - modelName: The name of the CoreML model to load.
+    ///   - initialPrompt: Optional comma-separated list of custom vocabulary.
     ///   - reply: Callback indicating success or failure message.
-    func initializeEngine(modelName: String, reply: @escaping (Bool, String?) -> Void)
+    func initializeEngine(modelName: String, initialPrompt: String?, reply: @escaping (Bool, String?) -> Void)
     
     /// Pushes a chunk of audio data to the engine for processing.
     /// - Parameters:

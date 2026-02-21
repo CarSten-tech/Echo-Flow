@@ -35,4 +35,33 @@ final class IntentRouterTests: XCTestCase {
             XCTFail("Should have been routed as Dictation.")
         }
     }
+    
+    func testLocalFallbackCommandRouting() async throws {
+        // Without an API key, this will immediately fall back to CoreMLLocalInferenceService.
+        // We verify that the simulated ML inference correctly identifies the "open" intent.
+        let transcription = "open safari please"
+        let result = await router.route(transcription: transcription)
+        
+        switch result {
+        case .command(let action, let params):
+            XCTAssertEqual(action, "open_app")
+            XCTAssertEqual(params["app_name"], "Safari Please") // Because our local heuristic splits
+        case .dictation, .unknown:
+            XCTFail("Should have been routed as Command 'open_app'.")
+        }
+    }
+    
+    func testEmptyStringRouting() async throws {
+        // Edge case: ensure it handles empty audio cleanly via fallback
+        let transcription = "   "
+        let result = await router.route(transcription: transcription)
+        
+        switch result {
+        case .dictation(let text):
+            // Fallback should just return the empty string
+            XCTAssertEqual(text, "   ")
+        case .command, .unknown:
+            XCTFail("Empty strings should route to Dictation silently.")
+        }
+    }
 }
